@@ -291,13 +291,13 @@ def getppdata(Index,vep_hgvsc,gene,polyphen_score,sift_score,cadd_scaled):
 #    if (row.cadd_scaled != "None"):
 #        if (float(row.cadd_scaled) > cadd_min):
 #            consens += 1
-    if (polyphen_score != "None"):
+    if (not isinstance(polyphen_score, str)): # covers if the value is "None" or "NA"
         if (float(polyphen_score) > ppsift_min):
             consens += 1
-    if (sift_score != "None"):
+    if (not isinstance(sift_score, str)): # covers if the value is "None" or "NA"
         if (1 - float(sift_score) > ppsift_min):
             consens += 1
-    if (cadd_scaled != "None"):
+    if (not isinstance(cadd_scaled, str)): # covers if the value is "None" or "NA"
         if (float(cadd_scaled) > cadd_min):
             consens += 1
     
@@ -570,6 +570,10 @@ def main(argv):
         df1 = pd.read_csv(rawdatafile, sep='\t')
         df = df1.replace(np.nan, '', regex=True)
         doacmg(df,db_file)
+        print("finished acmg")
+        #with open('acmg.out.tsv','a') as lf:
+        #    lf.write(df)
+        df.to_csv("./acmg.out.tsv",sep="\t",header=True,index=False)
 
 
 if __name__ == "__main__":
