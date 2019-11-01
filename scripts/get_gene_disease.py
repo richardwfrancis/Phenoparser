@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+import sys
+import getopt
 from gene_disease import restClient, geneClient, getGeneList
 import multiprocessing as mp
 from nested_dict import nested_dict
@@ -90,43 +92,60 @@ def getginfo(geneList,omim_key):
 
     return g_information
 
-if __name__ == '__main__':
-    gene_db = "Torrent.db"
+def main(argv):
+    gene_db = ""
     impact_disease_db = "acmg_id.db"
-    omim_key = "Wqy5lssmS7uWGdpyy8H9zw"
+    omim_key = ""
     geneList = []
-     
-    # create database connections
-    print("connecting to {}".format(gene_db),flush=True)
-    gene_conn = create_connection(gene_db)
-    print("connecting to {}".format(impact_disease_db),flush=True)
-    id_conn = create_connection(impact_disease_db)
-    
-    # make the table
-    print("making impact_disease database",flush=True)
-    make_table(id_conn)
 
-    # get the genes from the database
-    print("getting genes",flush=True)
-    #geneList = ['IRF6','MT-ND4','VWA1']
-    geneList = get_genes(gene_conn)
+    try:
+        opts, args = getopt.getopt(argv,"ho:v:g:",["omimkey=","vardb=","gddb="])
+    except getopt.GetoptError:
+        print('acmg.py -o <omimkey> -v <variantdb> -g <genediseasedb>')
+        sys.exit(2)
+    for opt, arg in opts:
+        if opt == '-h':
+            print('acmg.py -o <omimkey> -v <variantdb> -g <genediseasedb>')
+            sys.exit()
+        elif opt in ("-o", "--omimkey"):
+            omim_key = arg
+        elif opt in ("-g", "--gddb"):
+            impact_disease_db = arg
+        elif opt in ("-v", "--vardb"):
+            gene_db = arg
 
-    # get the information
-    print("getting gene information",flush=True)
-    #g_information = getginfo(geneList,omim_key)
-    g_information = getginfoasync(geneList,omim_key)
-    # pickle it
-    #filename = '/home/richard/pipeline/scripts/Phenoparser/scripts/g_information.pickle'
-    #with open(filename, 'wb') as f:
-    #        dill.dump(g_information, f)
-    print("collected information for {} genes".format(len(g_information)),flush=True)
+    if ((omim_key == "" | gene_db == "")):
+        print("You must provide both an omim key and a variant database as made by build_gemini.sh\nacmg.py -o <omimkey> -v <variantdb> -g <genediseasedb>")
+        sys.exit()
+    else:
+        # create database connections
+        print("connecting to {}".format(gene_db),flush=True)
+        gene_conn = create_connection(gene_db)
+        print("connecting to {}".format(impact_disease_db),flush=True)
+        id_conn = create_connection(impact_disease_db)
+        
+        # make the table
+        print("making impact_disease database",flush=True)
+        make_table(id_conn)
 
-    # load the data
-    print("loading gene information",flush=True)
-    load_table(id_conn,g_information)
+        # get the genes from the database
+        print("getting genes",flush=True)
+        #geneList = ['IRF6','MT-ND4','VWA1']
+        geneList = get_genes(gene_conn)
 
-    print("closing connections",flush=True)
-    gene_conn.close()
-    id_conn.close()
+        # get the information
+        print("getting gene information",flush=True)
+        #g_information = getginfo(geneList,omim_key)
+        g_information = getginfoasync(geneList,omim_key)
+        print("collected information for {} genes".format(len(g_information)),flush=True)
 
+        # load the data
+        print("loading gene information",flush=True)
+        load_table(id_conn,g_information)
 
+        print("closing connections",flush=True)
+        gene_conn.close()
+        id_conn.close()
+
+if __name__ == "__main__":
+   main(sys.argv[1:])
