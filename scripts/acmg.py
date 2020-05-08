@@ -465,7 +465,7 @@ def doacmg(df,db_file):
         df.at[row.Index, 'domains'] = ",".join([str(x) for x in row.domains])
 
     with open('acmg.log','a') as lf:
-        lf.write('got ps1 data\ngetting pm1, pm2, pm4 data')
+        lf.write('got ps1 data\ngetting pm1, pm2, pm4 data\n')
 
 ##########
 # pm1, pm2, pm4
@@ -476,8 +476,9 @@ def doacmg(df,db_file):
         pm1_caution = pm2_caution = pm4_caution = ""
         if (row.pfam_domain != "None") | (row.domains != ""):
             pm1 = 1
-        if float(row.max_aaf_all) <= af:
-            pm2 = 1
+        if (not isinstance(row.max_aaf_all, str)):
+            if float(row.max_aaf_all) <= af:
+                pm2 = 1
         # surely other things can cause protein length changes
         if row.impact in ['stop_lost','inframe_insertion','inframe_deletion']:
             pm4 = 1
@@ -490,7 +491,7 @@ def doacmg(df,db_file):
         df.at[row.Index, 'pm4_caution'] = pm4_caution
 
     with open('acmg.log','a') as lf:
-        lf.write('got pm1, pm2, pm4 data\ngetting pp2, pp3 data')
+        lf.write('got pm1, pm2, pm4 data\ngetting pp2, pp3 data\n')
 
     #print("got pm1,2,4",flush=True)
 
@@ -549,19 +550,22 @@ def main(argv):
 
     rawdatafile = ''
     db_file = ''
+    prefix = ''
     try:
-        opts, args = getopt.getopt(argv,"hs:g:",["snpdata=","gddb="])
+        opts, args = getopt.getopt(argv,"hs:g:p:",["snpdata=","gddb=","prefix="])
     except getopt.GetoptError:
-        print('acmg.py -s <snpdata> -g <genediseasedb>')
+        print('acmg.py -s <snpdata> -g <genediseasedb> -p <prefix>')
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-h':
-            print('acmg.py -s <inputfile> -g <genediseasedb>')
+            print('acmg.py -s <inputfile> -g <genediseasedb> -p <prefix>')
             sys.exit()
         elif opt in ("-s", "--snpdata"):
             rawdatafile = arg
         elif opt in ("-g", "--gddb"):
             db_file = arg
+        elif opt in ("-p", "--prefix"):
+            prefix = arg
 
     if ((rawdatafile == "") | (db_file == "")):
         print("You must provide both an input file and a database file\nacmg.py -s <inputfile> -g <genediseasedb>")
@@ -573,7 +577,8 @@ def main(argv):
         print("finished acmg")
         #with open('acmg.out.tsv','a') as lf:
         #    lf.write(df)
-        df.to_csv("./acmg.out.tsv",sep="\t",header=True,index=False)
+        filename = "{}{}".format(prefix,"acmg.out.tsv")
+        df.to_csv(filename,sep="\t",header=True,index=False)
 
 
 if __name__ == "__main__":
