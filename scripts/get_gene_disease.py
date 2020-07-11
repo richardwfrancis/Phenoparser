@@ -36,18 +36,25 @@ def make_table(conn):
  
     return None
 
-def get_genes(conn):
+def get_genes(conn,gdbtype):
     """
-    Get the genes out of the gemini database
-    :param conn: the Connection object
+    Get the genes out of the gemini database or file
+    :param conn: the Connection object or filename
+    :param gdbtype: the type (gemini or file)
     :return:
     """
-    cur = conn.cursor()
-    cur.execute("select distinct gene from gene_summary where is_hgnc = 1 and hgnc_id is not null")
-    rows = cur.fetchall()
     allrows = []
-    for r in rows:
-        allrows.append(r[0])
+    if gdbtype == "gemini":
+        cur = conn.cursor()
+        cur.execute("select distinct gene from gene_summary where is_hgnc = 1 and hgnc_id is not null")
+        rows = cur.fetchall()
+        for r in rows:
+            allrows.append(r[0])
+    else:
+        f=open(conn,"r")
+        allrows = [x.strip() for x in f.readlines()]
+        f.close()
+
     return allrows
 
 def load_table(conn,row_data):
@@ -67,10 +74,11 @@ def load_table(conn,row_data):
 
     conn.commit()
 
-def getginfoasync(geneList,omim_key):
+def getginfoasync(geneList,omim_key,cpu):
     g_information = []
     #pool = mp.Pool(mp.cpu_count())
-    pool = mp.Pool(100)
+    #pool = mp.Pool(100)
+    pool = mp.Pool(int(cpu))
     #result_objects = [pool.apply_async(getGeneList, args=(gene, omim_key)) for gene in geneList]
     g_information = pool.starmap_async(getGeneList, [(gene, omim_key) for i, gene in enumerate(geneList)]).get()
     #print(results)
@@ -94,33 +102,43 @@ def getginfo(geneList,omim_key):
 
 def main(argv):
     gene_db = ""
-    impact_disease_db = "acmg_id.db"
+    gene_db_type = ""
+    impact_disease_db = "acmg_gid.db"
     omim_key = ""
+    cpu = 2
     geneList = []
 
     try:
-        opts, args = getopt.getopt(argv,"ho:v:g:",["omimkey=","vardb=","gddb="])
+        opts, args = getopt.getopt(argv,"hk:g:t:o:c:",["omimkey=","genes=","gtype=","giddb=","cpu="])
     except getopt.GetoptError:
-        print('acmg.py -o <omimkey> -v <variantdb> -g <genediseasedb>')
+        print('get_gene_disease.py -k <omimKey> -g <geneData> -t <geneDataType> -o <geneImpactDiseaseDB>')
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-h':
-            print('acmg.py -o <omimkey> -v <variantdb> -g <genediseasedb>')
+            print('get_gene_disease.py -k <omimKey> -g <geneData> -t <geneDataType> -o <geneImpactDiseaseDB> -c <numThreads>')
             sys.exit()
-        elif opt in ("-o", "--omimkey"):
+        elif opt in ("-k", "--omimkey"):
             omim_key = arg
-        elif opt in ("-g", "--gddb"):
-            impact_disease_db = arg
-        elif opt in ("-v", "--vardb"):
+        elif opt in ("-g", "--genes"):
             gene_db = arg
+        elif opt in ("-t", "--gtype"):
+            gene_db_type = arg
+        elif opt in ("-o", "--giddb"):
+            impact_disease_db = arg
+        elif opt in ("-c", "--cpu"):
+            cpu = arg
 
-    if ((omim_key == "" | gene_db == "")):
-        print("You must provide both an omim key and a variant database as made by build_gemini.sh\nacmg.py -o <omimkey> -v <variantdb> -g <genediseasedb>")
+    if ((omim_key == "" or gene_db == "" or gene_db_type == "")):
+        print("You must provide both an omim key (-k) and a source of genes (-g).\nThis could be a GEMINI database as made by build_gemini.sh (-t gemini) or a file containing a list of genes (-t file)\nget_gene_disease.py -k <omimKey> -g <geneData> -t <geneDataType> -o <geneImpactDiseaseDB> -c <numThreads>")
         sys.exit()
     else:
         # create database connections
-        print("connecting to {}".format(gene_db),flush=True)
-        gene_conn = create_connection(gene_db)
+        # connect to the gene source if it is a database
+        gene_conn = gene_db
+        if (gene_db_type == "gemini"):
+            print("connecting to {}".format(gene_db),flush=True)
+            gene_conn = create_connection(gene_db)
+            
         print("connecting to {}".format(impact_disease_db),flush=True)
         id_conn = create_connection(impact_disease_db)
         
@@ -128,15 +146,16 @@ def main(argv):
         print("making impact_disease database",flush=True)
         make_table(id_conn)
 
-        # get the genes from the database
+        # get the genes from the database or file
         print("getting genes",flush=True)
-        #geneList = ['IRF6','MT-ND4','VWA1']
-        geneList = get_genes(gene_conn)
+        #geneList = ['NPPA','IRF6','MT-ND4','VWA1']
+        #geneList = ['NPPA']
+        geneList = get_genes(gene_conn,gene_db_type)
 
         # get the information
         print("getting gene information",flush=True)
         #g_information = getginfo(geneList,omim_key)
-        g_information = getginfoasync(geneList,omim_key)
+        g_information = getginfoasync(geneList,omim_key,cpu)
         print("collected information for {} genes".format(len(g_information)),flush=True)
 
         # load the data
@@ -144,7 +163,8 @@ def main(argv):
         load_table(id_conn,g_information)
 
         print("closing connections",flush=True)
-        gene_conn.close()
+        if (gene_db_type == "gemini"):
+            gene_conn.close()
         id_conn.close()
 
 if __name__ == "__main__":

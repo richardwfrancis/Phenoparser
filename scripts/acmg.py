@@ -419,7 +419,7 @@ def doacmg(df,db_file):
         if "pathogenic" in row.clinvar_sig.split(','):
             pvs1 = 1
             pvs1_caution = ""
-        
+       
         # is impact (taken from the most affected transcript) in high_impact
         elif row.impact in high_impact:
             # is this impact a known mechanism of disease in the gene this variant affects
@@ -435,7 +435,7 @@ def doacmg(df,db_file):
         df.at[row.Index, 'pvs1_caution'] = pvs1_caution
 
     with open('acmg.log','a') as lf:
-        lf.write('got pvs1 data\ngetting ps1 data')
+        lf.write('got pvs1 data\ngetting ps1 data\n')
     #print("pvs1 set",flush=True)
 
 ##########
@@ -474,7 +474,7 @@ def doacmg(df,db_file):
     for row in df.itertuples(index=True):
         pm1 = pm2 = pm4 = 0
         pm1_caution = pm2_caution = pm4_caution = ""
-        if (row.pfam_domain != "None") | (row.domains != ""):
+        if (row.pfam_domain != "None") | (row.pfam_domain != "") | (row.domains != ""):
             pm1 = 1
         if (not isinstance(row.max_aaf_all, str)):
             if float(row.max_aaf_all) <= af:
